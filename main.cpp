@@ -3,13 +3,11 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
-#include <omp.h>
 #include <random>
 #include <string>
 #include <vector>
 
 double PI = 3.14159265358979323846;
-int LENGTH, PRECISION = 5;
 
 struct bounds {
   double min, max;
@@ -39,7 +37,7 @@ double dejong1(const std::vector<double> &x, int dimensions) {
 double schwefel(const std::vector<double> &x, int dimensions) {
   double sum = 0.0;
   for (int i = 0; i < dimensions; i++) {
-    sum += x[i] * sin(sqrt(abs(x[i])));
+    sum += x[i] * sin(sqrt(std::abs(x[i])));
   }
   return 418.9829 * dimensions - sum;
 }
@@ -50,7 +48,7 @@ int calculate_length(const bounds &bounds, int dimensions, int precision) {
 }
 
 std::random_device random_device;
-std::mt19937 random_generator(omp_get_thread_num() + random_device());
+std::mt19937 random_generator(random_device());
 
 std::vector<char> generate_random_bits(int length) {
   std::uniform_int_distribution<int> distribution(0, 1);
@@ -105,4 +103,22 @@ double calculate_function(const std::vector<char> &bits,
   return func(values, dimensions);
 }
 
-int main() { std::cout << "Hello world"; }
+double calculate_fitness(int function_value, int global_minimum) {
+  return std::abs(function_value - global_minimum);
+}
+
+int main() {
+  bounds dejong1_bounds = {-5.12, 5.12};
+  bounds schwefel_bounds = {-500, 500};
+  bounds rastrigin_bounds = {-5.12, 5.12};
+  bounds michalewicz_bounds = {0, M_PI};
+
+  int precision = 1;
+  int dimensions = 5;
+
+  auto length = calculate_length(michalewicz_bounds, dimensions, precision);
+
+  auto bits = generate_random_bits(length);
+
+  auto numbers = bits_to_number(bits, rastrigin_bounds, length, dimensions);
+}
