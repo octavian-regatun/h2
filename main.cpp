@@ -23,7 +23,6 @@ std::mt19937 random_generator(random_device());
 #define CROSSOVER_RATE 0.5
 #define NUMBER_OF_GENES 10
 
-// Algoritm genetic crossover plus elitism
 std::vector<char> genetic_algorithm(MathFunction math_function, int dimensions, int population_size, int iterations, double mutation_rate, double crossover_rate) {
     Population population(population_size, dimensions, PRECISION, math_function);
     Population new_population(population_size, dimensions, PRECISION, math_function);
@@ -41,10 +40,10 @@ std::vector<char> genetic_algorithm(MathFunction math_function, int dimensions, 
         new_population.chromosomes.insert(new_population.chromosomes.end(), population.chromosomes.begin(), population.chromosomes.begin() + elitism_size);
 
         // Completează restul populației
-        Population aux(population_size, dimensions, PRECISION, math_function);
-        aux.select_population(population_size - elitism_size);
-        aux.crossover(crossover_rate);
-        aux.mutation(mutation_rate);
+        Population selected_population(population_size, dimensions, PRECISION, math_function);
+        selected_population.select_population(population_size - elitism_size);
+        selected_population.crossover(crossover_rate);
+        select_population.mutation(mutation_rate);
 
         // Adaugă indivizii selectați, încrucișați și mutați în noua populație
         new_population.chromosomes.insert(new_population.chromosomes.end(), selected_population.chromosomes.begin(), selected_population.chromosomes.end());
