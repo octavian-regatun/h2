@@ -24,7 +24,7 @@ MathFunction michalewicz = MathFunction(
             sum -= sin(x[i]) * pow(sin((i + 1) * x[i] * x[i] / PI), 2 * 10);
         return sum;
     },
-    {0, PI}, -4.687658);
+    {0, PI}, -9.66015);
 
 MathFunction dejong1 = MathFunction(
     [](const std::vector<double>&x, int dimensions) {

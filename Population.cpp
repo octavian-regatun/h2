@@ -7,6 +7,7 @@
 #include "MathFunction.h"
 #include <algorithm>
 #include <cmath>
+#include <random>
 #include <vector>
 #include <random>
 
@@ -16,7 +17,8 @@ Population::Population(int number_of_chromosomes, int dimensions, int precision,
     int number_of_genes = calculate_length();
 
     for (int i = 0; i < number_of_chromosomes; i++) {
-        chromosomes.push_back(new Chromosome(number_of_genes));
+        auto chromosome = new Chromosome(number_of_genes);
+        chromosomes.push_back(*chromosome);
     }
 }
 
@@ -27,92 +29,91 @@ int Population::calculate_length() {
                                                        math_function.bounds.min))));
 }
 
-void Population::evaluate_population(MathFunction math_function) {
-    double C = 1000.0;
+void Population::normalize_fitness() {
+    for (auto&chromosome: chromosomes) {
+        chromosome.calculate_fitness(math_function, dimensions);
+        chromosome.fitness = 1 / chromosome.fitness;
+    }
+
+    double fitness_sum = 0;
+    for (auto&chromosome: chromosomes) {
+        fitness_sum += chromosome.fitness;
+    }
 
     for (auto&chromosome: chromosomes) {
-        double function_value =
-                chromosome->calculate_function_value(math_function, dimensions);
-        if (function_value < 0) {
-            chromosome->fitness = function_value + C;
-        }
-        else {
-            chromosome->fitness = 1.0 / (function_value + 1.0);
+        chromosome.fitness /= fitness_sum;
+    }
+}
+
+void Population::calculate_cumsum() {
+    // sort them based on fitness value (descending order)
+    std::sort(chromosomes.begin(), chromosomes.end(),
+              [](const Chromosome&lhs, const Chromosome&rhs) {
+                  return lhs.fitness > rhs.fitness;
+              });
+
+    for (int i = 0; i < chromosomes.size(); i++) {
+        chromosomes[i].cumsum = 0;
+        for (int j = i; j < chromosomes.size(); j++) {
+            chromosomes[i].cumsum += chromosomes[j].fitness;
         }
     }
 }
 
-void Population::mutation(double mutation_rate) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0.0, 1.0);
+void Population::crossover(double crossover_rate, double elitism_rate, double mutation_rate) {
+    auto elites_chromosomes = elitism(elitism_rate);
+    std::vector<Chromosome> new_chromosomes = elites_chromosomes;
+
+    for (int i = 0; i < (chromosomes.size() - elites_chromosomes.size()) / 2; i++) {
+        std::uniform_real_distribution<double> distribution(1, calculate_length() - 1);
+        auto random_generator = std::mt19937(std::random_device()());
+        int crossover_point = static_cast<int>(distribution(random_generator));
+
+        auto parent1 = pick_parent();
+        // TODO: write a more efficient way to pick parent2
+        Chromosome* parent2 = nullptr;
+        do {
+            parent2 = pick_parent();
+        }
+        while (parent2 == nullptr && parent2->fitness == parent1->fitness);
+
+        auto childs = Chromosome::crossover(parent1, parent2, crossover_point, crossover_rate);
+
+        childs[0].mutate(mutation_rate);
+        childs[1].mutate(mutation_rate);
+
+        new_chromosomes.insert(new_chromosomes.end(), childs.begin(), childs.end());
+    }
+
+    chromosomes = new_chromosomes;
+}
+
+Chromosome* Population::pick_parent() {
+    std::uniform_real_distribution<double> distribution(0, 1);
+    auto random_generator = std::mt19937(std::random_device()());
+    double random = distribution(random_generator);
 
     for (auto&chromosome: chromosomes) {
-        for (int index = 0; index < dimensions; index++) {
-            if (dis(gen) < mutation_rate) {
-                chromosome->flip_gene(index);
-            }
+        if (random >= chromosome.cumsum) {
+            return &chromosome;
         }
+    }
+    return &chromosomes[chromosomes.size() - 1];
+}
+
+void Population::mutate(double mutation_rate) {
+    for (auto&chromosome: chromosomes) {
+        chromosome.mutate(mutation_rate);
     }
 }
 
-void Population::crossover(double crossover_rate) {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0.0, 1.0);
-    std::uniform_int_distribution<> point_dis(1, chromosomes[0]->genes.size() -
-                                                 2); // Exclude capetele
+std::vector<Chromosome> Population::elitism(double elitism_rate) {
+    int number_of_elites = floor(chromosomes.size() * elitism_rate);
+    std::vector<Chromosome> elite_chromosomes;
 
-    for (size_t i = 0; i < chromosomes.size() - 1; i += 2) {
-        if (dis(gen) < crossover_rate) {
-            int crossover_point = point_dis(gen);
-            for (int j = crossover_point; j < chromosomes[i]->genes.size(); j++) {
-                std::swap(chromosomes[i]->genes[j], chromosomes[i + 1]->genes[j]);
-            }
-        }
-    }
-}
-
-Population* Population::select_population(int num_selected) {
-    // Calculul fitness-ului total
-    double total_fitness =
-            std::accumulate(chromosomes.begin(), chromosomes.end(), 0.0,
-                            [](double sum, Chromosome* chromosome) {
-                                return sum + chromosome->fitness;
-                            });
-
-    // Calculul probabilităților pentru fiecare cromozom
-    std::vector<double> probabilities(chromosomes.size());
-    for (size_t i = 0; i < chromosomes.size(); i++) {
-        probabilities[i] = chromosomes[i]->fitness / total_fitness;
+    for (int i = 0; i < number_of_elites; i++) {
+        elite_chromosomes.push_back(chromosomes[i]);
     }
 
-    // Calculul probabilităților cumulative
-    std::vector<double> cumulative_probabilities(chromosomes.size() + 1, 0.0);
-    std::partial_sum(probabilities.begin(), probabilities.end(),
-                     cumulative_probabilities.begin() + 1);
-
-    // Inițializarea generatorului de numere aleatorii
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0.0, 1.0);
-
-    // Selecția cromozomilor pe baza probabilităților cumulative
-    std::vector<Chromosome *> selected_population;
-    for (int i = 0; i < num_selected; i++) {
-        double r = dis(gen);
-        auto it = std::upper_bound(cumulative_probabilities.begin(),
-                                   cumulative_probabilities.end(), r);
-        int index = std::distance(cumulative_probabilities.begin(), it) - 1;
-
-        selected_population.push_back(chromosomes[index]);
-    }
-
-    // Crearea unei noi populații cu cromozomii selectați
-    Population* new_population = new Population(num_selected, dimensions, precision, math_function);
-    for (int i = 0; i < num_selected; ++i) {
-        new_population->chromosomes[i] = new Chromosome(*selected_population[i]);
-    }
-
-    return new_population;
+    return elite_chromosomes;
 }

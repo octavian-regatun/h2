@@ -9,22 +9,26 @@
 
 class Population {
 public:
-    std::vector<Chromosome *> chromosomes;
-    int dimensions{};
-    int precision{};
+    std::vector<Chromosome> chromosomes;
+    int dimensions;
+    int precision;
     MathFunction math_function;
 
     Population(int number_of_chromosomes, int dimensions, int precision, MathFunction math_function);
 
     int calculate_length();
 
-    void evaluate_population(MathFunction math_function);
+    void normalize_fitness();
 
-    void mutation(double mutation_rate);
+    void calculate_cumsum();
 
-    void crossover(double crossover_rate);
+    Chromosome* pick_parent();
 
-    Population* select_population(int num_selected);
+    void crossover(double crossover_rate, double elitism_rate,double mutation_rate);
+
+    void mutate(double mutation_rate);
+
+    std::vector<Chromosome> elitism(double elitism_rate);
 };
 
 #endif //POPULATION_H

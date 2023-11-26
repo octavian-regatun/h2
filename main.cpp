@@ -5,80 +5,49 @@
 #include "Population.h"
 
 int main() {
-    int dimensions = 1;
+    // ----------CONSTANTS----------
+    int dimensions = 30;
     int precision = 5;
-    int population_size = 100;
-    int generations = 1000;
-    double mutation_rate = 0.1;
-    double crossover_rate = 0.5;
+    int population_size = 200;
+    int generations = 2000;
+    double mutation_rate = 1.0 / 800.0;
+    double crossover_rate = 0.6;
+    double elitism_rate = 0.05;
+    MathFunction math_function = rastrigin;
 
-    auto math_function = rastrigin;
+    // ----------CREATE POPULATION----------
+    Population population(population_size, dimensions, precision, rastrigin);
 
-    Population population(population_size, dimensions, precision, math_function);
-    Population new_population(population_size, dimensions, precision,
-                              math_function);
-
-    int elitism_size =
-            static_cast<int>(population_size * 0.05); // 5% pentru elitism
-
-    for (int t = 0; t < generations; t++) {
-        population.evaluate_population(math_function);
-
-        for (size_t i = 0; i < population.chromosomes.size(); ++i) {
-            for (size_t j = 0; j < population.chromosomes.size() - i - 1; ++j) {
-                if (population.chromosomes[j]->fitness < population.chromosomes[j + 1]->fitness) {
-                    std::swap(population.chromosomes[j], population.chromosomes[j + 1]);
-                }
-            }
-        }
-
-        // Păstrează cei mai buni 5% indivizi pentru elitism
-        new_population.chromosomes.clear();
-        new_population.chromosomes.insert(
-            new_population.chromosomes.end(), population.chromosomes.begin(),
-            population.chromosomes.begin() + elitism_size);
-
-        // Completează restul populației
-        auto selected_population =
-                new Population(population_size, dimensions, precision, math_function);
-
-        selected_population =
-                population.select_population(population_size - elitism_size);
-        selected_population->crossover(crossover_rate);
-        selected_population->mutation(mutation_rate);
-
-        // Adaugă indivizii selectați, încrucișați și mutați în noua populație
-        new_population.chromosomes.insert(new_population.chromosomes.end(),
-                                          selected_population->chromosomes.begin(),
-                                          selected_population->chromosomes.end());
-        // Actualizează populația pentru următoarea iterație
-        population = new_population;
+    for (int i = 1; i <= generations; i++) {
+        population.normalize_fitness();
+        population.calculate_cumsum();
+        population.crossover(crossover_rate, elitism_rate, mutation_rate);
+        std::cout << "Generation " << i << " done!" << std::endl;
     }
 
-    // Găsește cel mai bun individ după ultima iterație
-    Chromosome* best_chromosome = nullptr;
 
-    if (!population.chromosomes.empty()) {
-        best_chromosome = population.chromosomes[0];
-        for (Chromosome* current_chromosome: population.chromosomes) {
-            if (current_chromosome->fitness < best_chromosome->fitness) {
-                best_chromosome = current_chromosome;
-            }
-        }
+    // ----------DEBUG----------
+    population.normalize_fitness();
+    population.calculate_cumsum();
+    int index = 0;
+    for (auto&chromosome: population.chromosomes) {
+        printf("Chromosome %d:\n", ++index);
+        printf("Function Value: %.5f\n", chromosome.calculate_function_value(math_function, dimensions));
+        printf("Fitness: %.3f\n", chromosome.fitness);
+        printf("Cumsum: %.3f\n", chromosome.cumsum);
+        printf("\n\n");
     }
 
-    std::cout << "Best chromosome: ";
-    for (char gene: best_chromosome->genes) {
-        std::cout << gene;
-    }
-    std::cout << std::endl;
+    // display the best chromosome
+    auto best_chromosome = population.chromosomes[0];
+    printf("Function Global Minimum: %.5f\n", math_function.global_minimum);
+    printf("Best Chromosome:\n");
+    printf("Function Value: %.5f\n", best_chromosome.calculate_function_value(math_function, dimensions));
+    printf("Fitness: %.3f\n", best_chromosome.fitness);
+    printf("Cumsum: %.3f\n", best_chromosome.cumsum);
+    printf("\n\n");
 
-    std::cout << "Best chromosome value: "
-            << best_chromosome->calculate_function_value(math_function,
-                                                         dimensions)
-            << std::endl;
-
-    std::cout << "Global minimum: " << math_function.global_minimum << std::endl;
+    printf("Program Done Running!");
 
     return 0;
 }
